@@ -31,10 +31,11 @@ class CraftTransformedImageModel implements TransformedImageInterface
      * @param LocalTargetImageModel $targetModel
      * @param LocalSourceImageModel $sourceModel
      * @param array                 $transform
+     * @param bool                  $useTransform   Use the transform size rather than using source or target sizes
      *
      * @throws ImagerException
      */
-    public function __construct($targetModel, $sourceModel, $transform)
+    public function __construct($targetModel, $sourceModel, $transform, $useTransform=false)
     {
         $this->path = $targetModel->getFilePath();
         $this->filename = $targetModel->filename;
@@ -54,6 +55,9 @@ class CraftTransformedImageModel implements TransformedImageInterface
         if (\is_array($imageInfo) && $imageInfo[0] !== '' && $imageInfo[1] !== '') {
             $this->width = $imageInfo[0];
             $this->height = $imageInfo[1];
+        } else if ($useTransform){ // Used when using external storage
+            $this->width = $transform['width'];
+            $this->height = $transform['height'];
         } else { // Couldn't get size. Calculate size based on source image and transform.
             /** @var ConfigModel $settings */
             $config = ImagerService::getConfig();

@@ -91,7 +91,6 @@ class CraftTransformer extends Component implements TransformerInterface
         }
 
         $taskCreated = false;
-
         // Loop over transformed images and do post optimizations and upload to external storage 
         foreach ($transformedImages as $transformedImage) {
             /** @var CraftTransformedImageModel $transformedImage */
@@ -162,6 +161,35 @@ class CraftTransformer extends Component implements TransformerInterface
     // =========================================================================
 
     /**
+     * Checks if file exists on external storage by performing a HEAD request
+     * Will also add a blank file in place of $filepath to ensure external storage
+     * gets used rather than generating a new image
+     * Returns true for a hit, false for a miss
+     * 
+     * @param string    $url
+     * @param string    $filepath
+     * 
+     * @return bool
+     */
+    private function checkExternalStorage($url, $filepath)
+    {
+        $externalCh = curl_init($url);
+        $externalOptions = [
+            CURLOPT_CUSTOMREQUEST => 'HEAD',
+            CURLOPT_TIMEOUT_MS => 500
+        ];
+        curl_setopt_array($externalCh, $externalOptions);
+        $externalResponse = curl_exec($externalCh);
+        $externalHttpStatus = curl_getinfo($externalCh, CURLINFO_HTTP_CODE);
+        curl_close ($externalCh);
+        if (!file_exists(dirname($filepath))){
+            mkdir(dirname($filepath), 0775, true);
+        }
+        touch($filepath);
+        return ($externalHttpStatus === 200);
+    }
+
+    /**
      * Gets one transformed image based on source image and transform
      *
      * @param LocalSourceImageModel $sourceModel
@@ -192,7 +220,14 @@ class CraftTransformer extends Component implements TransformerInterface
         // Set save options
         $saveOptions = $this->getSaveOptions($targetModel->extension, $transform);
 
-        // Do transform if transform doesn't exist, cache is disabled, or cache expired
+        // If the file doesn't exist, and checkExternalStorage is enabled then check external storage first
+        if (!file_exists($targetModel->getFilePath()) &&
+            $config->getSetting('checkExternalStorage', $transform)
+        ){
+            $this->checkExternalStorage($targetModel->url, $targetModel->getFilePath());
+        }
+
+        // Do transform if transform doesn't exist, cache is disabled, or cache expired and check external storage is turned on and misses
         if (!$config->getSetting('cacheEnabled', $transform) ||
             !file_exists($targetModel->getFilePath()) ||
             (($config->getSetting('cacheDuration', $transform) !== false) && (FileHelper::lastModifiedTime($targetModel->getFilePath()) + $config->getSetting('cacheDuration', $transform) < time()))
@@ -316,8 +351,8 @@ class CraftTransformer extends Component implements TransformerInterface
             $targetModel->isNew = true;
         }
 
-        // create CraftTransformedImageModel for transformed image
-        $imageModel = new CraftTransformedImageModel($targetModel, $sourceModel, $transform);
+        // create CraftTransformedImageModel for transformed image; if we are using external storage then use the transform array rather than local files
+        $imageModel = new CraftTransformedImageModel($targetModel, $sourceModel, $transform, $config->getSetting('checkExternalStorage', $transform));
 
         return $imageModel;
     }

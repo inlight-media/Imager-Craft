@@ -41,6 +41,7 @@ class Settings extends Model
     public $useRemoteUrlQueryString = false;
     public $instanceReuseEnabled = false;
     public $noop = false;
+    public $checkExternalStorage = false;
     public $suppressExceptions = false;
     public $convertToRGB = false;
     public $skipExecutableExistCheck = false;
