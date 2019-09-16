@@ -220,6 +220,14 @@ class CraftTransformer extends Component implements TransformerInterface
         // Set save options
         $saveOptions = $this->getSaveOptions($targetModel->extension, $transform);
 
+        $useExternalStorageTransform = $config->getSetting('checkExternalStorage', $transform);
+
+        // If the transform doesn't have width and height then we'll need a local copy before we can continue.
+        if (!array_key_exists("height", $transform) || !array_key_exists("width", $transform)){
+            $sourceModel->getLocalCopy(); // getLocalCopy has it's own cache handling
+            $useExternalStorageTransform = false; // we will still use external storage, but will use a local copy of the image
+        }
+
         // If the file doesn't exist, and checkExternalStorage is enabled then check external storage first
         if (!file_exists($targetModel->getFilePath()) &&
             $config->getSetting('checkExternalStorage', $transform)
@@ -352,7 +360,7 @@ class CraftTransformer extends Component implements TransformerInterface
         }
 
         // create CraftTransformedImageModel for transformed image; if we are using external storage then use the transform array rather than local files
-        $imageModel = new CraftTransformedImageModel($targetModel, $sourceModel, $transform, $config->getSetting('checkExternalStorage', $transform));
+        $imageModel = new CraftTransformedImageModel($targetModel, $sourceModel, $transform, $useExternalStorageTransform);
 
         return $imageModel;
     }
